@@ -7,6 +7,7 @@ NOTES TO WORK ON
 -Fix for undo not working on castling if more than once in a row
 -Fix undo crashing if undoing very first move
 -Fix being unable to detect en passant pins
+-Add 50-move and threefold repetition draw
 -Initial UI window to set each color as human or AI
     -Window for user choice of pawn promotion
     -Add play as black functionality
@@ -14,7 +15,7 @@ NOTES TO WORK ON
 
 -AI start
     -Random move algorithm
-    -Function for getting all possible positions at certain depth, test compare to broader consensus
+    -Function for getting all possible positions at certain depth, test compare to broader consensus (checking for legal move bugs)
 
     -Evaluation function
     -Cache an evaluation/best move for previous positions using FEN notation
@@ -24,7 +25,8 @@ NOTES TO WORK ON
 class GameState():
     def __init__(self):
 
-        self.FEN = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 20'
+        # manually enter FEN here
+        self.FEN = ''
 
         if self.FEN == '':
             self.board = {
@@ -533,13 +535,17 @@ class GameState():
             if r == 'q':
                 self.currCastlingRights.q = True
 
-        self.enpassantSq = int(FEN[spaces[2]+1]) if FEN[spaces[2]+1] != '-' else -1 # 0-63 sq where "phantom" pawn is for en passant
-        #print(FEN[spaces[3] : spaces[4]-1])
-        #print(FEN[spaces[4]+1 : spaces[4]+2])
-        self.halfMoveClock = int(FEN[spaces[3]+1 : spaces[4]-1])
-        self.fullMoveCounter = int(FEN[spaces[4]+1 : -1])
-        #print(self.halfMoveClock)
-        #print(self.fullMoveCounter)
+        # to convert from board integer to chess notation: (file, rank) and back
+        # for example: [52 , 36] <-> e2e4
+        intToNotation = {}
+        for i in range(8):
+            for j in range(8):
+                # create dict mapping 0-63 sq to its chess notation sq (eg. 'g3')
+                intToNotation[8*i+j] = list(map(chr, range(97, 105)))[j] + str(list(reversed(range(8)))[i]+1) 
+        notationToInt = {val:key for key,val in intToNotation.items()} 
+        self.enpassantSq = notationToInt[FEN[spaces[2]+1 : spaces[3]]] if FEN[spaces[2]+1] != '-' else -1 # 0-63 sq where "phantom" pawn is for en passant
+        self.halfMoveClock = int(FEN[spaces[3]+1 : spaces[4]])
+        self.fullMoveCounter = int(FEN[spaces[4]+1 : ])
 
 class Move():      
 
