@@ -34,7 +34,6 @@ def main():
     legalMoves = game_state.getLegalMoves() # call this to generate possible moves for current position
     # do NOT call this every frame. It is 'spensive
     moveMade = False
-    #print('Total legal moves : ' + str(len(legalMoves)))
 
     currSq = -1 # 0-63 int describing square currently selected (-1 is none selected)
     moveCandidate = [] # list of up to two integers describing a move user intends
@@ -54,12 +53,12 @@ def main():
                 if (p.mouse.get_pressed()[0] == True) and (gameOver == False): # if left clicked and game hasn't finished
                     location = p.mouse.get_pos() # location[0,1] is (x,y) pixel clicked on
                     col = location[0] // sq_size
-                    rowStart = (location[1] // sq_size) * 8
-                    if currSq == (rowStart + col): # check for user clicking same square twice
+                    row = (location[1] // sq_size) * 8
+                    if currSq == (row + col): # check for user clicking same square twice
                         currSq = -1 # deselect the square
                         moveCandidate = [] # reset move 
                     else:
-                        currSq = rowStart + col if game_state.playAsBlack == False else 63 - (rowStart + col) # 0-63
+                        currSq = row + col if game_state.playAsBlack == False else 63 - (row + col) # 0-63
                         moveCandidate.append(currSq) # add selected square to moveCandidate 
 
                 elif p.mouse.get_pressed()[2] == True: # if right clicked
