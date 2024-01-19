@@ -3,17 +3,17 @@ Current state of chess game: current position, move log, possible valid moves, w
 Valid move logic
 Bot logic
 
-NOTES TO WORK ON
+TO WORK ON:
 -Fix for undo not working on castling if more than once in a row
 -Fix undo crashing if undoing very first move
 -Fix being unable to detect en passant pins
 -Add 50-move and threefold repetition draw
--Initial UI window to set each color as human or AI
+-UI 
+    -Window to set each color as human or AI pregame
     -Window for user choice of pawn promotion
-    -Add play as black functionality
-    -Flip board to play as black
+    -Flip board if black is human
 
--AI start
+-Start AI
     -Random move algorithm
     -Function for getting all possible positions at certain depth, test compare to broader consensus (checking for legal move bugs)
 
@@ -27,6 +27,9 @@ class GameState():
 
         # manually enter FEN here
         self.FEN = ''
+
+        # do you want to play as black?
+        self.playAsBlack = False
 
         if self.FEN == '':
             self.board = {
@@ -50,15 +53,14 @@ class GameState():
         else:
             self.readFEN(self.FEN)
 
+        if self.playAsBlack == True:
+            self.board = dict(reversed(self.board.items()))
+
         # list of castling rights for each logged position
         self.castleRightsLog = [CastlingRights(self.currCastlingRights.K, self.currCastlingRights.Q, 
                                 self.currCastlingRights.k, self.currCastlingRights.q)]
-        self.moveLog = []
-        self.inCheck = False
-        self.pins = [] # list of tuples of (square of pinned piece, direction (outward from king) of pin)
-        self.checks = [] # list of tuples of (square of checking piece, direction (outward from king) of check) 
-        self.checkmate = False
-        self.stalemate = False
+        self.moveLog = self.pins = self.checks = [] # pins and checks are lists of tuples of (square of pinned/checking piece, direction outward from king of pin/check)
+        self.inCheck = self.checkmate = self.stalemate = False
         self.left_edge = [0,8,16,24,32,40,48,56]
         self.right_edge = [7,15,23,31,39,47,55,63]
         self.directions = {'NW':-9, 'N':-8, 'NE':-7, 'W':-1, 'E':1, 'SW':7, 'S':8, 'SE':9}
@@ -222,7 +224,7 @@ class GameState():
     def allPossibleMoves(self):
         # logic for how each piece moves, disregarding circumstantial rules (such as check)
         moves = []
-        for sq in range(64):
+        for sq in self.board.keys():
             color = self.board[sq].isupper() # True if piece is white, False if piece is black
             if color == self.whiteToMove: # If piece color == whose turn
                 if self.board[sq].lower() == 'p':
@@ -504,6 +506,7 @@ class GameState():
         return inCheck, pins, checks
 
     def readFEN(self, FEN):
+        # Example:
         # rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2
         self.board = {}
         for i in range(64):

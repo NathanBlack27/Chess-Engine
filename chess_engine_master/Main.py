@@ -59,7 +59,7 @@ def main():
                         currSq = -1 # deselect the square
                         moveCandidate = [] # reset move 
                     else:
-                        currSq = rowStart + col # 0-63
+                        currSq = rowStart + col if game_state.playAsBlack == False else 63 - (rowStart + col) # 0-63
                         moveCandidate.append(currSq) # add selected square to moveCandidate 
 
                 elif p.mouse.get_pressed()[2] == True: # if right clicked
@@ -110,7 +110,7 @@ def main():
 
 def drawGameState(screen, game_state, currSq, legalMoves):
     drawSquares(screen, currSq, legalMoves, game_state) # squares are drawn over previously drawn images
-    drawPieces(screen, game_state.board) # draw current board state pieces over squares
+    drawPieces(screen, game_state) # draw current board state pieces over squares
 
 def drawSquares(screen, sq, moves, game_state):
     # drawing light/dark squares, highlighting noteworthy squares
@@ -129,16 +129,16 @@ def drawSquares(screen, sq, moves, game_state):
 
     if 0 <= sq <= 63: # sq = -1 if nothing selected, so no highlight
         # highlight for currSq selected
-        highlight = p.Rect((sq % 8)*sq_size, (sq // 8)*sq_size, sq_size, sq_size)
+        highlight = p.Rect((flip(sq) % 8)*sq_size, (flip(sq) // 8)*sq_size, sq_size, sq_size) if game_state.playAsBlack else p.Rect((sq % 8)*sq_size, (sq // 8)*sq_size, sq_size, sq_size)
         p.draw.rect(screen, color[2], highlight)
 
         # highlight legal moves for selected piece
         for m in moves: # iterating over current legal moves
             if m.start == sq: # legal move possibility == selected sq
-                circleCenter = ((m.end % 8)*sq_size + (sq_size/2), (m.end // 8)*sq_size + (sq_size/2))
+                circleCenter = ((flip(m.end) % 8)*sq_size + (sq_size/2), (flip(m.end) // 8)*sq_size + (sq_size/2)) if game_state.playAsBlack else ((m.end % 8)*sq_size + (sq_size/2), (m.end // 8)*sq_size + (sq_size/2))
                 if m.pieceCaptured == '-': # normal circle on blank squares
                     p.draw.circle(screen, color[4], circleCenter, round(sq_size/6))
-                else: # hollow circle on captures
+                else: # larger hollow circle on captures
                     p.draw.circle(screen, color[4], circleCenter, round(sq_size/2), round(sq_size/10))
 
     if game_state.inCheck:
@@ -147,13 +147,20 @@ def drawSquares(screen, sq, moves, game_state):
             kingSq = game_state.wKingSq
         else:
             kingSq = game_state.bKingSq
-        highlight = p.Rect((kingSq % 8)*sq_size, (kingSq // 8)*sq_size, sq_size, sq_size)
+        #if game_state.playAsBlack:
+        #    kingSq = flipInteger(kingSq)
+        highlight = p.Rect((flip(kingSq) % 8)*sq_size, (flip(kingSq) // 8)*sq_size, sq_size, sq_size) if game_state.playAsBlack else p.Rect((kingSq % 8)*sq_size, (kingSq // 8)*sq_size, sq_size, sq_size)
         p.draw.rect(screen, color[3], highlight)
 
-def drawPieces(screen, board):
-    for i in range(64):
-        if board[i] != '-':
-            screen.blit(images[board[i]], p.Rect((i % 8)*sq_size-1 if board[i].lower()=='p' else (i % 8)*sq_size, (i // 8)*sq_size , sq_size, sq_size)) # grab dict index and draw associated image on board[i]
+def drawPieces(screen, game_state):
+    if game_state.playAsBlack == False: # draw pieces from white's perspective
+        for i in game_state.board.keys():
+            if game_state.board[i] != '-':
+                screen.blit(images[game_state.board[i]], p.Rect((i % 8)*sq_size-1 if game_state.board[i].lower()=='p' else (i % 8)*sq_size, (i // 8)*sq_size , sq_size, sq_size)) # grab dict index and draw associated image on board[i]
+    else: # black's perspective
+        for i in game_state.board.keys():
+            if game_state.board[i] != '-':
+                screen.blit(images[game_state.board[i]], p.Rect((flip(i) % 8)*sq_size-1 if game_state.board[i].lower()=='p' else (flip(i) % 8)*sq_size, (flip(i) // 8)*sq_size , sq_size, sq_size)) # grab dict index and draw associated image on board[i]
 
 def waitForKeypress():
     while True:
@@ -166,6 +173,9 @@ def waitForKeypress():
                 elif e.key == p.K_b:
                     return 'b'
                 elif e.key == p.K_n:
-                    return'n'  
+                    return'n' 
+
+def flip(sq):
+    return 63 - sq
                     
 main()
