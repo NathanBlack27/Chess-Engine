@@ -27,7 +27,7 @@ class GameState():
     def __init__(self):
 
         # manually enter FEN here
-        self.FEN = '8/B5bb/8/8/R1p3k1/4P3/K2P4/8 b - d3 1 1'
+        self.FEN = ''
 
         # do you want to play as black?
         self.playAsBlack = False
