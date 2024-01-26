@@ -63,7 +63,7 @@ def main():
 
                 elif p.mouse.get_pressed()[2] == True: # if right clicked
                     game_state.undo() # undo previous move
-                    moveMade = True # flag to re-generate all legal moves from new position
+                    moveMade = True # flag to re-generate legal moves from new position
 
             elif e.type == p.KEYDOWN: # what to do with key presses
                 if e.key == p.K_z: # the Z key is pressed
@@ -92,15 +92,8 @@ def main():
 
         if moveMade == True: # if a move (or undo) was made this frame, re-generate legal moves for new position
             legalMoves = game_state.getLegalMoves()
-            '''
-            count = 0
-            for m in range(len(legalMoves)):
-                if legalMoves[m].promotion:
-                    count += 1
-            print(count)
-            '''
             moveMade = False
-            gameOver = True if game_state.checkmate or game_state.stalemate else False
+            gameOver = True if game_state.checkmate or game_state.draw else False
 
         # finish this frame by drawing board and ticking clock
         drawGameState(screen, game_state, currSq, legalMoves)
@@ -113,7 +106,7 @@ def drawGameState(screen, game_state, currSq, legalMoves):
 
 def drawSquares(screen, sq, moves, game_state):
     # drawing light/dark squares, highlighting noteworthy squares
-    color = [(116,148,172), (218,228,232), (250, 236, 132), (233,132,119), (175,175,175)] # dark, light, selected sq, king in check
+    color = [(116,148,172), (218,228,232), (250, 236, 132), (233,132,119), (175,175,175)] # dark, light, selected sq, king in check, legal moves circle
     for horz in range(4):
         for vert in range(4):
             #create top-left 2x2 corner, repeat 4 times horz and 4 times vert
@@ -142,12 +135,7 @@ def drawSquares(screen, sq, moves, game_state):
 
     if game_state.inCheck:
         # highlight king if in check
-        if game_state.whiteToMove:
-            kingSq = game_state.wKingSq
-        else:
-            kingSq = game_state.bKingSq
-        #if game_state.playAsBlack:
-        #    kingSq = flipInteger(kingSq)
+        kingSq = game_state.wKingSq if game_state.whiteToMove else game_state.bKingSq
         highlight = p.Rect((flip(kingSq) % 8)*sq_size, (flip(kingSq) // 8)*sq_size, sq_size, sq_size) if game_state.playAsBlack else p.Rect((kingSq % 8)*sq_size, (kingSq // 8)*sq_size, sq_size, sq_size)
         p.draw.rect(screen, color[3], highlight)
 
