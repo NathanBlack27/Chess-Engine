@@ -515,8 +515,6 @@ class GameState():
                 elif endPiece.isupper() == self.whiteToMove and endPiece.lower() != 'k': # if allied piece                        
                     if possiblePin == (): # have not seen allied piece in this direction yet
                         possiblePin = (end, d) # add (square of pinned piece, direction)
-                        #if (d == 'W' or d == 'E') and type == 'p' and ((self.whiteToMove and 24 <= end <= 31) or (not self.whiteToMove and 32 <= end <= 39)) and\
-                        #    :
                     else: # if already seen allied piece in this direction
                     # no pin or check is possible in this direction
                         break
@@ -537,8 +535,6 @@ class GameState():
                             pins.append(possiblePin)
                             break
                     else: # enemy piece cannot see king (for example, piece orthogonal and is a bishop)
-                        #if type == 'p' and (d == 'E' or d == 'W') and ((self.whiteToMove and 24 <= end <= 31) or (not self.whiteToMove and 32 <= end <= 39)):
-                        #    continue
                         break 
         knightMoves = [start-17, start-15, start-10, start-6, start+6, start+10, start+15, start+17]
         for end in knightMoves:
