@@ -23,7 +23,7 @@ class GameState():
     def __init__(self):
 
         # manually enter FEN here
-        self.FEN = 'rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8'
+        self.FEN = ''#rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8'
 
         # do you want to play from black's perspective?
         self.playAsBlack = False

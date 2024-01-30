@@ -42,7 +42,7 @@ def main():
     choice = ''
     gameOver = False
     whitePlayer = True # true if human playing white
-    blackPlayer = True # true if human playing black
+    blackPlayer = False # true if human playing black
 
     done = False
     while not done:
