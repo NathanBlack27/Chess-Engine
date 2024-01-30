@@ -4,15 +4,11 @@ Valid move logic
 Bot logic
 
 TO WORK ON:
--Fix for undo not working on castling if more than once in a row
--Fix undo crashing if undoing very first move
--Fix being unable to detect en passant pins
+-Fix for undo not working on castling if more than once in a row. Same with FEN position storage
 -All FEN cases accounted for?
--Add threefold repetition draw
 -UI 
     -Window to set each color as human or AI pregame
     -Window for user choice of pawn promotion
-    -Flip board if black is human
 
 -Start AI
     -Random move algorithm
@@ -27,10 +23,17 @@ class GameState():
     def __init__(self):
 
         # manually enter FEN here
-        self.FEN = ''
+        self.FEN = 'rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8'
 
-        # do you want to play as black?
+        # do you want to play from black's perspective?
         self.playAsBlack = False
+
+        self.left_edge = [0,8,16,24,32,40,48,56]
+        self.right_edge = [7,15,23,31,39,47,55,63]
+        self.directions = {'NW':-9, 'N':-8, 'NE':-7, 'W':-1, 'E':1, 'SW':7, 'S':8, 'SE':9}
+        self.moveLog = self.pins = self.checks = [] # pins and checks are lists of tuples of (square of pinned/checking piece, direction outward from king of pin/check)
+        self.positionOccurrences = {}
+        self.inCheck = self.checkmate = self.draw = False
 
         if self.FEN == '':
             self.board = {
@@ -50,21 +53,17 @@ class GameState():
             self.enpassantSq = -1 # 0-63 sq where "phantom" pawn is for en passant
             self.halfMoveClock = 0
             self.fullMoveCounter = 1
+            self.positionLog = [self.boardToFEN()]
 
         else:
             self.readFEN(self.FEN)
+            self.positionLog = [self.FEN]
+
+        # list of castling rights for each logged position
+        self.castleRightsLog = [CastlingRights(self.currCastlingRights.K, self.currCastlingRights.Q, self.currCastlingRights.k, self.currCastlingRights.q)]
 
         if self.playAsBlack == True:
             self.board = dict(reversed(self.board.items()))
-
-        # list of castling rights for each logged position
-        self.castleRightsLog = [CastlingRights(self.currCastlingRights.K, self.currCastlingRights.Q, 
-                                self.currCastlingRights.k, self.currCastlingRights.q)]
-        self.moveLog = self.pins = self.checks = [] # pins and checks are lists of tuples of (square of pinned/checking piece, direction outward from king of pin/check)
-        self.inCheck = self.checkmate = self.draw = False
-        self.left_edge = [0,8,16,24,32,40,48,56]
-        self.right_edge = [7,15,23,31,39,47,55,63]
-        self.directions = {'NW':-9, 'N':-8, 'NE':-7, 'W':-1, 'E':1, 'SW':7, 'S':8, 'SE':9}
 
     def readFEN(self, FEN):
         # Example:
@@ -92,24 +91,64 @@ class GameState():
         for r in FEN[spaces[1] : spaces[2]]: # grab castling rights data
             if r == 'K':
                 self.currCastlingRights.K = True
-            if r == 'Q':
+            elif r == 'Q':
                 self.currCastlingRights.Q = True
-            if r == 'k':
+            elif r == 'k':
                 self.currCastlingRights.k = True
-            if r == 'q':
+            elif r == 'q':
                 self.currCastlingRights.q = True
 
-        # to convert from board integer to chess notation: (file, rank) and back
-        # for example: [52 , 36] <-> e2e4
+        self.enpassantSq = self.convertIntNotation(s = (FEN[spaces[2]+1 : spaces[3]])) if FEN[spaces[2]+1] != '-' else -1 # 0-63 sq where "phantom" pawn is for en passant
+        self.halfMoveClock = int(FEN[spaces[3]+1 : spaces[4]])
+        self.fullMoveCounter = int(FEN[spaces[4]+1 : ])
+
+    def boardToFEN(self):
+        # convert game state to FEN string
+        FEN = ''
+
+        blankCount = 0
+        for sq in self.board:
+
+            if sq in self.left_edge:
+                FEN += str(blankCount) if blankCount != 0 else ''
+                FEN += '/' if sq != 0 else ''
+                blankCount = 0
+
+            if self.board[sq] == '-':
+                blankCount += 1
+            else:
+                FEN += str(blankCount) if blankCount != 0 else ''
+                FEN += self.board[sq]
+                blankCount = 0
+
+            if blankCount == 8:
+                FEN += '8'
+                blankCount = 0
+
+        FEN += ' w' if self.whiteToMove else ' b'
+
+        if self.currCastlingRights.K == True or self.currCastlingRights.Q == True or self.currCastlingRights.k == True or self.currCastlingRights.q == True:
+            FEN += ' '
+        if self.currCastlingRights.K == True:
+            FEN += 'K'
+        if self.currCastlingRights.Q == True:
+            FEN += 'Q'
+        if self.currCastlingRights.k == True:
+            FEN += 'k'
+        if self.currCastlingRights.q == True:
+            FEN += 'q'
+
         intToNotation = {}
         for i in range(8):
             for j in range(8):
                 # create dict mapping 0-63 sq to its chess notation sq (eg. 'g3')
-                intToNotation[8*i+j] = list(map(chr, range(97, 105)))[j] + str(list(reversed(range(8)))[i]+1) 
-        notationToInt = {val:key for key,val in intToNotation.items()} 
-        self.enpassantSq = notationToInt[FEN[spaces[2]+1 : spaces[3]]] if FEN[spaces[2]+1] != '-' else -1 # 0-63 sq where "phantom" pawn is for en passant
-        self.halfMoveClock = int(FEN[spaces[3]+1 : spaces[4]])
-        self.fullMoveCounter = int(FEN[spaces[4]+1 : ])
+                intToNotation[8*i+j] = list(map(chr, range(97, 105)))[j] + str(list(reversed(range(8)))[i]+1)
+        FEN = FEN + ' ' + self.convertIntNotation(i = self.enpassantSq) if self.enpassantSq != -1 else FEN + ' -'
+
+        FEN = FEN + ' ' + str(self.halfMoveClock)
+        FEN = FEN + ' ' + str(self.fullMoveCounter)
+
+        return FEN
 
     def makeMove(self, move):
         self.board[move.start] = '-' # make start sqaure empty
@@ -156,6 +195,15 @@ class GameState():
             self.fullMoveCounter += 1
         self.whiteToMove = not self.whiteToMove # switch whose turn it is
 
+        # store FEN strings in positionLog and positionOccurances to check for 3-move repetition
+        if move.pieceCaptured != '-':
+            # for optimization, reset 3-move dict on capture (repetition not possible before vs after capture, so no need to compare)
+            # bug created here for undoing FIXME
+            self.positionOccurrences = {}
+        newPos = self.boardToFEN()
+        self.positionLog.append(newPos)
+        self.positionOccurrences[newPos[0:newPos.find(' ')]] = self.positionOccurrences.get(newPos[0:newPos.find(' ')], 0) + 1
+
     def updateCastlingRights(self, move):
         if move.pieceMoved == 'K': # white king moves
             self.currCastlingRights.K = False
@@ -198,6 +246,9 @@ class GameState():
 
             if self.whiteToMove == False: # if undoing black move
                 self.fullMoveCounter -= 1
+            # decrement half move counter
+            if self.halfMoveClock != 0:
+                self.halfMoveClock -= 1
                 
             # undo en passant capture
             if move.isEnpassant:
@@ -211,13 +262,16 @@ class GameState():
                 self.enpassantSq = -1
 
             # case where undoing multiple moves in a row, reset en passant square based on previous move info
-            prevMove = self.moveLog[-1]
-            if prevMove.pieceMoved.lower() == 'p' and abs(prevMove.start - prevMove.end) == 16: # only on 2-square advances
-                self.enpassantSq = (prevMove.start + prevMove.end) // 2
+            if move.pieceMoved.lower() == 'p' and abs(move.start - move.end) == 16: # only on 2-square advances
+                self.enpassantSq = (move.start + move.end) // 2
 
             # restore castle rights
             self.castleRightsLog.pop()
             self.currCastlingRights = self.castleRightsLog[-1]
+
+            # undo FEN log and occurrences
+            undonePos = self.positionLog.pop()
+            self.positionOccurrences[undonePos[0:undonePos.find(' ')]] -= 1
 
             # undo castling
             if move.isCastle:
@@ -257,6 +311,7 @@ class GameState():
         else: # not in check
             moves = self.allPossibleMoves()
 
+        # checking for game end
         if len(moves) == 0: # no legal moves in current board position
             if self.inCheck:
                 self.checkmate = True
@@ -271,6 +326,10 @@ class GameState():
         if self.halfMoveClock >= 100:
             self.draw = True
             print('Draw by 50-move rule.')
+
+        if 3 in self.positionOccurrences.values():
+            self.draw = True
+            print('Draw by repetition.')
 
         return moves
 
@@ -496,6 +555,7 @@ class GameState():
         inCheck = False
         for d in self.directions: # iterating over each direction [NW, N, NE, W, E, SW, S, SE]
             possiblePin = () # tuple containing (pinned piece square, direction outward from king)
+            possibleEPPin = [] # list of two 0-63 squares that allied pawn could be pinned from en passant
             for i in range(1,8): # iterate outward starting from king
                 end = start+(i*+self.directions[d])
 
@@ -532,10 +592,20 @@ class GameState():
                             checks.append((end, d))
                             break
                         else: # allied piece is between king and enemy piece
-                            pins.append(possiblePin)
+                            if possiblePin[0] in possibleEPPin:
+                                # pin this pawn from en passant-ing, but only vertically
+                                pins.append((possiblePin[0] , 'S')) if not self.whiteToMove else pins.append((possiblePin[0] , 'N'))
+                            else:
+                                pins.append(possiblePin)
                             break
                     else: # enemy piece cannot see king (for example, piece orthogonal and is a bishop)
-                        break 
+                        # check for enemy pawn that could be captured en passant
+                        if type == 'p' and ((self.whiteToMove and end-8 == self.enpassantSq) or (not self.whiteToMove and end+8 == self.enpassantSq)):
+                            possibleEPPin = [end+1, end-1]
+                            # no break this direction yet to detect other enemy pieces beyond enemy pawn
+                        else: # no need to keep checking this direction
+                            break 
+
         knightMoves = [start-17, start-15, start-10, start-6, start+6, start+10, start+15, start+17]
         for end in knightMoves:
             # dont care if above/below board, ally piece, or not a knight
@@ -560,9 +630,23 @@ class GameState():
 
         return inCheck, pins, checks
 
+    def convertIntNotation(self, i = -1, s = ''):
+        # pass in 0-63 integer OR board coordinate (such as 'g5') to convert to its other form
+        intToNotation = {}
+        for a in range(8):
+            for b in range(8):
+                # create dict mapping 0-63 sq to its chess notation sq (eg. 'g3')
+                intToNotation[8*a+b] = list(map(chr, range(97, 105)))[b] + str(list(reversed(range(8)))[a]+1) 
+        notationToInt = {val:key for key,val in intToNotation.items()} 
+
+        if i != -1:
+            converted = intToNotation[i] 
+        elif s != '':
+            converted = notationToInt[s]
+
+        return converted
 
 class Move():      
-
     def __init__(self, start, end, board, isEnpassant = False, isCastle = False, promotionChoice = 'q'):
         self.start = start # 0-63
         self.end = end # 0-63
@@ -580,19 +664,20 @@ class Move():
 
         # castling move flag
         self.isCastle = isCastle
-
-    # to convert from board integer to chess notation: (file, rank) and back
-    # for example: [52 , 36] <-> e2e4
-    intToNotation = {}
-    for i in range(8):
-        for j in range(8):
-            # create dict mapping 0-63 sq to its chess notation sq (eg. 'g3')
-            intToNotation[8*i+j] = list(map(chr, range(97, 105)))[j] + str(list(reversed(range(8)))[i]+1) 
-    notationToInt = {val:key for key,val in intToNotation.items()} 
     
     def getChessNotation(self, start, end): # INCOMPLETE. Need to add 'x' for capture, '+' for check, etc
         # start and end should be 0-63 integers
-        return self.intToNotation[start] + self.intToNotation[end]
+
+        # to convert from board integer to chess notation: (file, rank) and back
+        # for example: [52 , 36] <-> e2e4
+        intToNotation = {}
+        for i in range(8):
+            for j in range(8):
+                # create dict mapping 0-63 sq to its chess notation sq (eg. 'g3')
+                intToNotation[8*i+j] = list(map(chr, range(97, 105)))[j] + str(list(reversed(range(8)))[i]+1) 
+        #notationToInt = {val:key for key,val in intToNotation.items()} 
+
+        return intToNotation[start] + intToNotation[end]
     
     def __eq__(self, other): # something called overriding equals? 
         # This checks if some element (in this case the chess notation) is the same between class objects

@@ -4,7 +4,7 @@ drawing board/pieces from current position, other graphics
 """
 
 import pygame as p
-import Engine
+import Engine, ChessAI
 
 width = height = 400
 dimension = 8
@@ -41,16 +41,19 @@ def main():
     global choice
     choice = ''
     gameOver = False
+    whitePlayer = True # true if human playing white
+    blackPlayer = True # true if human playing black
 
     done = False
     while not done:
+        humanTurn = (game_state.whiteToMove and whitePlayer) or (not game_state.whiteToMove and blackPlayer)
         # the following is done once per frame
         for e in p.event.get():
             if e.type == p.QUIT: # if mouse press red X,
                 done = True # quit program
 
             elif e.type == p.MOUSEBUTTONDOWN: # what to do with user clicks
-                if (p.mouse.get_pressed()[0] == True) and (gameOver == False): # if left clicked and game hasn't finished
+                if (p.mouse.get_pressed()[0] == True) and (gameOver == False) and (humanTurn): # if left clicked and game hasn't finished
                     location = p.mouse.get_pos() # location[0,1] is (x,y) pixel clicked on
                     col = location[0] // sq_size
                     row = (location[1] // sq_size) * 8
@@ -89,6 +92,12 @@ def main():
                     moveCandidate = []
             if moveMade == False: # if user inputted move != one of the legal moves
                 moveCandidate = [currSq]
+
+        # AI make move
+        if not gameOver and not humanTurn: 
+            AImove = ChessAI.randomMove(legalMoves)
+            game_state.makeMove(AImove)
+            moveMade = True
 
         if moveMade == True: # if a move (or undo) was made this frame, re-generate legal moves for new position
             legalMoves = game_state.getLegalMoves()
