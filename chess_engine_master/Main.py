@@ -67,6 +67,7 @@ def main():
                 elif p.mouse.get_pressed()[2] == True: # if right clicked
                     game_state.undo() # undo previous move
                     moveMade = True # flag to re-generate legal moves from new position
+                    gameOver = False
 
             elif e.type == p.KEYDOWN: # what to do with key presses
                 if e.key == p.K_z: # the Z key is pressed
@@ -75,7 +76,7 @@ def main():
                     legalMoves = game_state.getLegalMoves()
                     currSq = -1
                     moveCandidate = []
-                    moveMade = False 
+                    moveMade = gameOver = False
 
         if len(moveCandidate) == 2: # once we have start and end clicks
             move = Engine.Move(start = moveCandidate[0], end = moveCandidate[1], board = game_state.board) # make a move object with user clicks
@@ -95,12 +96,23 @@ def main():
 
         # AI make move
         if not gameOver and not humanTurn: 
-            AImove = ChessAI.randomMove(legalMoves)
+            AImove = ChessAI.findBestMove(game_state, legalMoves)
+            if AImove is None:
+                AImove = ChessAI.randomMove(legalMoves)
             game_state.makeMove(AImove)
             moveMade = True
 
         if moveMade == True: # if a move (or undo) was made this frame, re-generate legal moves for new position
             legalMoves = game_state.getLegalMoves()
+            if game_state.checkmate:
+                c = 'Black' if game_state.whiteToMove else 'White'
+                print(c + ' wins the game!')
+            elif game_state.stalemate:
+                print('Draw by stalemate.')
+            elif game_state.threefold:
+                print('Draw by repetition.')
+            elif game_state.fiftymove:
+                print('Draw by 50-move rule.')
             moveMade = False
             gameOver = True if game_state.checkmate or game_state.draw else False
 

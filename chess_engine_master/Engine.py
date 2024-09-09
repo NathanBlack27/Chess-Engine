@@ -1,17 +1,16 @@
 """
 Current state of chess game: current position, move log, possible valid moves, whose turn
 Valid move logic
-Bot logic
 
 TO WORK ON:
 -Fix for undo not working on castling if more than once in a row. Same with FEN position storage
+-Fix draw by repetition. In general, it sucks. Triggers draw prematurely, it's slow
 -All FEN cases accounted for?
 -UI 
     -Window to set each color as human or AI pregame
     -Window for user choice of pawn promotion
 
 -Start AI
-    -Random move algorithm
     -Function for getting all possible positions at certain depth, test compare to broader consensus (checking for legal move bugs)
 
     -Evaluation function
@@ -23,7 +22,8 @@ class GameState():
     def __init__(self):
 
         # manually enter FEN here
-        self.FEN = ''#rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8'
+        self.FEN = ''#8/7Q/8/8/8/2K5/8/1k6 b KQ - 1 2'#8/7q/8/8/8/2k5/8/1K6 w KQ - 1 2'
+        #rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8'
 
         # do you want to play from black's perspective?
         self.playAsBlack = False
@@ -33,7 +33,7 @@ class GameState():
         self.directions = {'NW':-9, 'N':-8, 'NE':-7, 'W':-1, 'E':1, 'SW':7, 'S':8, 'SE':9}
         self.moveLog = self.pins = self.checks = [] # pins and checks are lists of tuples of (square of pinned/checking piece, direction outward from king of pin/check)
         self.positionOccurrences = {}
-        self.inCheck = self.checkmate = self.draw = False
+        self.inCheck = self.checkmate = self.draw = self.stalemate = self.fiftymove = self.threefold = False
 
         if self.FEN == '':
             self.board = {
@@ -66,6 +66,7 @@ class GameState():
             self.board = dict(reversed(self.board.items()))
 
     def readFEN(self, FEN):
+        # read FEN string to board position
         # Example:
         # rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2
         self.board = {}
@@ -87,6 +88,7 @@ class GameState():
                     s += int(c)
 
         self.whiteToMove = True if FEN[spaces[0]+1] == 'w' else False
+        
         self.currCastlingRights = CastlingRights(False, False, False, False) # castling rights for current position
         for r in FEN[spaces[1] : spaces[2]]: # grab castling rights data
             if r == 'K':
@@ -196,13 +198,13 @@ class GameState():
         self.whiteToMove = not self.whiteToMove # switch whose turn it is
 
         # store FEN strings in positionLog and positionOccurances to check for 3-move repetition
-        if move.pieceCaptured != '-':
+        #if move.pieceCaptured != '-':
             # for optimization, reset 3-move dict on capture (repetition not possible before vs after capture, so no need to compare)
             # bug created here for undoing FIXME
-            self.positionOccurrences = {}
-        newPos = self.boardToFEN()
-        self.positionLog.append(newPos)
-        self.positionOccurrences[newPos[0:newPos.find(' ')]] = self.positionOccurrences.get(newPos[0:newPos.find(' ')], 0) + 1
+        #    self.positionOccurrences = {}
+        #newPos = self.boardToFEN()
+        #self.positionLog.append(newPos)
+        #self.positionOccurrences[newPos[0:newPos.find(' ')]] = self.positionOccurrences.get(newPos[0:newPos.find(' ')], 0) + 1
 
     def updateCastlingRights(self, move):
         if move.pieceMoved == 'K': # white king moves
@@ -237,7 +239,6 @@ class GameState():
             move = self.moveLog.pop()
             self.board[move.start] = move.pieceMoved # set start square to the piece moved (which is stored in the move object class)
             self.board[move.end] = move.pieceCaptured # replace end square with stored captured piece (can be '--', which is fine)
-            self.halfMoveClock -= 1
             self.whiteToMove = not self.whiteToMove # switch whose turn it is
             if move.pieceMoved == 'K':
                 self.wKingSq = move.start
@@ -270,8 +271,8 @@ class GameState():
             self.currCastlingRights = self.castleRightsLog[-1]
 
             # undo FEN log and occurrences
-            undonePos = self.positionLog.pop()
-            self.positionOccurrences[undonePos[0:undonePos.find(' ')]] -= 1
+            #undonePos = self.positionLog.pop()
+            #self.positionOccurrences[undonePos[0:undonePos.find(' ')]] -= 1
 
             # undo castling
             if move.isCastle:
@@ -281,6 +282,8 @@ class GameState():
                 else: # queenside castling
                     self.board[move.end-2] = self.board[move.end+1]
                     self.board[move.end+1] = '-'
+
+            self.checkmate = self.draw = self.stalemate = self.threefold = self.fiftymove = False
 
     def getLegalMoves(self):
         moves = []
@@ -315,21 +318,17 @@ class GameState():
         if len(moves) == 0: # no legal moves in current board position
             if self.inCheck:
                 self.checkmate = True
-                c = 'Black' if self.whiteToMove else 'White'
-                print(c + ' wins the game!')
             else:
-                self.draw = True
-                print('Draw by stalemate.')
+                self.draw = self.stalemate = True
         else: # make sure checkmate/stalemate don't act up (because of undo and such)
-            self.checkmate = False
-            self.draw = False
+            self.checkmate = self.draw = self.stalemate = False
         if self.halfMoveClock >= 100:
-            self.draw = True
-            print('Draw by 50-move rule.')
+            self.draw = self.fiftymove = True
 
         if 3 in self.positionOccurrences.values():
-            self.draw = True
-            print('Draw by repetition.')
+            self.draw = self.threefold = True
+
+        # ordering moves for future optimization here?
 
         return moves
 
